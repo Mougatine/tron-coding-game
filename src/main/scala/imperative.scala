@@ -84,7 +84,7 @@ object Player extends App {
     Array.fill[State](width * height)(Empty())
 
 
-  def getNeighbours(grid: Grid, state: State, x: Int, y: Int): Array[(Int, Int)] = {
+  def getNeighbours(fun: (Grid, Int, Int) => Boolean)(grid: Grid, x: Int, y: Int): Array[(Int, Int)] = {
     def possibleMoves: Array[(Int, Int)] =
       Array((0, -1), (-1, 0), (0, 1), (1, 0))
 
@@ -92,7 +92,7 @@ object Player extends App {
       x >= 0 && x < width && y >= 0 && y < height
 
     def cond(x: Int, y: Int): Boolean =
-      inGrid(x, y) && getValAt(grid, x, y) == state
+      inGrid(x, y) && fun(grid, x, y)
 
     possibleMoves
       .map(fact => (x + fact._1, y + fact._2))
@@ -109,25 +109,12 @@ object Player extends App {
    *    While there are still reachable tiles, for each player turn, expand to
    *    all adjacent tiles of last positions.
    */
-  def voronoi(grid: Grid, lastMovesAll: Array[Array[(Int, Int)]], nbPlayers: Int): Grid = {
-    /*
-     *  Expand for one player (i.e. one turn) to all adjacent tiles of the last
-     *  positions.
-     */
-    def playTurn(lastMovesPlayer: Array[(Int, Int)], id: Int): Array[(Int, Int)] = {
-      val nextMoves = lastMovesPlayer
-        .flatMap(move => getNeighbours(grid, Empty(), move._1, move._2))
-        .distinct
-
-      nextMoves.foreach(move => setValAt(grid, Predicted(id), move._1, move._2))
-      nextMoves
-    }
-
+  def voronoi(grid: Grid, lastMovesAll: Array[Array[(Int, Int)]], nbPlayers: Int, me: Int): Grid = {
     // All false when every reachable state for each player have been reached.
     val flags = Array.fill(nbPlayers)(true)
     while (flags.contains(true)) {
-      for (playerId <- 0 until nbPlayers) {
-        lastMovesAll(playerId) = playTurn(lastMovesAll(playerId), playerId)
+      for (playerId <- (me + 1 until nbPlayers).toList ++ (0 to me).toList) {
+        lastMovesAll(playerId) = playTurn(grid, lastMovesAll(playerId), Predicted(playerId))
         if (lastMovesAll(playerId).isEmpty)
           flags(playerId) = false
       }
@@ -136,7 +123,26 @@ object Player extends App {
     grid
   }
 
+
+  /*
+   *  Expand for one player (i.e. one turn) to all adjacent tiles of the last
+   *  positions.
+   */
+  def playTurn(grid: Grid, lastMovesPlayer: Array[(Int, Int)], state: State): Array[(Int, Int)] = {
+    def emptyCond = (grid: Grid, x: Int, y: Int) => getValAt(grid, x, y) == Empty()
+
+    val nextMoves = lastMovesPlayer
+      .flatMap(move => getNeighbours(emptyCond)(grid, move._1, move._2))
+      .distinct
+
+    nextMoves.foreach(move => setValAt(grid, state, move._1, move._2))
+    nextMoves
+  }
+
+
   def isAlone(grid: Grid, id: Int): Boolean = {
+    val predictCond =
+      (grid: Grid, x: Int, y: Int) => getValAt(grid, x, y) == Predicted(id)
     val myPrediction =
       (state: State) => state == Predicted(id)
     val opPrediction =
@@ -146,7 +152,7 @@ object Player extends App {
     for (y <- 0 until height) {
       for (x <- 0 until width) {
         if (opPrediction(getValAt(grid, x, y))) {
-          acc += getNeighbours(grid, Predicted(id), x, y).length
+          acc += getNeighbours(predictCond)(grid, x, y).length
         }
       }
     }
@@ -155,7 +161,7 @@ object Player extends App {
   }
 
 
-  def computeScore(grid: Grid, id: Int, direction: Direction): Int = {
+  def computeScore(grid: Grid, id: Int): Int = {
     val myPrediction =
       (state: State) => state == Predicted(id)
     val opPrediction =
@@ -164,36 +170,52 @@ object Player extends App {
     val myTiles = grid.count(tile => myPrediction(tile))
     val opTiles = grid.count(tile => opPrediction(tile))
 
-    val ans = 10 * myTiles - 1 * opTiles
-    System.err.println(direction2string(direction), 10 * myTiles, -1 * opTiles, ans)
-    ans
+    10 * myTiles - 1 * opTiles
   }
 
 
   def getNextMove(grid: Grid, lastMovesAll: Array[Array[(Int, Int)]], nbPlayers: Int, me: Int): String = {
-    def equi(x: Int, maxVal: Int): Boolean =
-      x >= (-100 + maxVal) && x <= (100 + maxVal)
+    def wallHugger(grid: Grid, direction: Direction): Int = {
+      val (x, y) = direction2pos1(direction)
+      setValAt(grid, Occupied(me), x, y)
+      val wallCond = (grid: Grid, x1: Int, y1: Int) => getValAt(grid, x1, y1).isInstanceOf[Occupied]
+
+      val wallNumber = getNeighbours(wallCond)(grid, x, y).length
+
+      System.err.println("Wall:", direction2string(direction), wallNumber)
+
+      wallNumber match {
+        case 0 => 0
+        case 1 => 0
+        case 2 => 100
+        case 3 => 60
+      }
+    }
 
     def goDirection(grid: Grid, direction: Direction, moves: Array[Array[(Int, Int)]]): Int = {
       val (newX, newY) = direction2pos1(direction)
-      moves(me) = Array((newX, newY))
       setValAt(grid, Predicted(me), newX, newY)
+      moves(me) = Array((newX, newY))
 
-      computeScore(voronoi(grid, moves, nbPlayers), me, direction)
+      val ansGrid = voronoi(grid, moves, nbPlayers, me)
+      //printGrid(ansGrid)
+      computeScore(ansGrid, me)
     }
 
     def goFourDirections(grid: Grid, direction: Direction, moves: Array[Array[(Int, Int)]]): Int = {
-      val (curX, curY) = direction2pos0(direction)
-      setValAt(grid, Occupied(me), curX, curY)
       val (newX, newY) = direction2pos1(direction)
-      val directions = Array(Up(newX, newY), Left(newX, newY), Down(newX, newY), Right(newX, newY))
+      setValAt(grid, Predicted(me), newX, newY)
+      moves(me) = Array((newX, newY))
 
-      val ans = directions
+      //for (playerId <- (me + 1 until nbPlayers).toList ++ (0 until me).toList)
+      //  moves(playerId) = playTurn(grid, moves(playerId), Predicted(playerId))
+
+      val ans = Array(Up(newX, newY), Left(newX, newY), Down(newX, newY), Right(newX, newY))
         .filter(dir => isValidTile(grid, direction2pos1(dir)._1, direction2pos1(dir)._2))
         .map(dir => goDirection(grid.clone, dir, lastMovesAll.clone))
-    
+
       if (ans.isEmpty)
-        -10000
+        0
       else
         ans.max
     }
@@ -205,13 +227,15 @@ object Player extends App {
         .filter(dir => isValidTile(grid, direction2pos1(dir)._1, direction2pos1(dir)._2))
         .map(dir => (fun(grid.clone, dir, lastMovesAll.clone), dir))
 
+
       if (directions.isEmpty)
         "Oh shit..."
       else {
+        directions.foreach(x => System.err.println(direction2string(x._2), x._1))
         direction2string(directions.maxBy(_._1)._2)
       }
     }
-    
+
     lookup(goDirection)(grid.clone, lastMovesAll.clone)
   }
 
