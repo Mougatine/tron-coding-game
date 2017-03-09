@@ -112,11 +112,16 @@ object Player extends App {
   def voronoi(grid: Grid, lastMovesAll: Array[Array[(Int, Int)]], nbPlayers: Int, me: Int): Grid = {
     // All false when every reachable state for each player have been reached.
     val flags = Array.fill(nbPlayers)(true)
+    var flag = true
     while (flags.contains(true)) {
       for (playerId <- (me + 1 until nbPlayers).toList ++ (0 to me).toList) {
-        lastMovesAll(playerId) = playTurn(grid, lastMovesAll(playerId), Predicted(playerId))
-        if (lastMovesAll(playerId).isEmpty)
-          flags(playerId) = false
+        if (flag && playerId == me)
+          flag = false
+        else {
+          lastMovesAll(playerId) = playTurn(grid, lastMovesAll(playerId), Predicted(playerId))
+          if (lastMovesAll(playerId).isEmpty)
+            flags(playerId) = false
+        }
       }
     }
 
@@ -236,7 +241,7 @@ object Player extends App {
       }
     }
 
-    lookup(goDirection)(grid.clone, lastMovesAll.clone)
+    lookup(goFourDirections)(grid.clone, lastMovesAll.clone)
   }
 
 
