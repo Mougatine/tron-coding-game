@@ -220,7 +220,7 @@ object Player extends App {
         .map(dir => goDirection(grid.clone, dir, lastMovesAll.clone))
 
       if (ans.isEmpty)
-        0
+        -100
       else
         ans.max
     }
@@ -237,7 +237,12 @@ object Player extends App {
         "Oh shit..."
       else {
         directions.foreach(x => System.err.println(direction2string(x._2), x._1))
-        direction2string(directions.maxBy(_._1)._2)
+        val maxVal = directions.maxBy(_._1)._1
+        val ans = directions
+            .filter(x => x._1 == maxVal)
+            .map(x => (wallHugger(grid, x._2), x._2))
+        
+        direction2string(ans.maxBy(_._1)._2)
       }
     }
 
