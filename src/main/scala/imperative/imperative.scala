@@ -1,5 +1,4 @@
-import math._
-import scala.util._
+package imperative
 
 /**
   * Auto-generated code below aims at helping you parse
@@ -36,6 +35,7 @@ object Player extends App {
     case Down(x, y)   => (x, y)
     case Right(x, y)  => (x, y)
   }
+
 
   def direction2pos1(direction: Direction): (Int, Int) = direction match {
     case Up(x, y)    => (x, y - 1)

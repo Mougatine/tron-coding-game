@@ -1,5 +1,4 @@
-import math._
-import scala.util._
+package functional
 
 /**
   * Auto-generated code below aims at helping you parse
