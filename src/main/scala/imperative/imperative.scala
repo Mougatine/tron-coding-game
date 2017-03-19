@@ -1,9 +1,10 @@
 package imperative
 
-/**
-  * Auto-generated code below aims at helping you parse
-  * the standard input according to the problem statement.
-  **/
+ /*
+  * login: <arthur.douillard@epita.fr>
+  * password: <SalutAdrienCaVa?>
+  * ranking: <12> // Classement des gens d'EPITA utilisant Scala
+  */
 object Player extends App {
   def width  = 30
   def height = 20
