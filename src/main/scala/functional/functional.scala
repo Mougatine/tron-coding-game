@@ -21,20 +21,15 @@ object Player extends App {
       grid(x + y * width) = va
 
 
-  def initGrid(default: State): Array[State] = {
-    def fillLine: Array[State] =
-      Array.fill(width)(default)
+  def initGrid(default: State): Array[State] =
+    Array.fill(width * height)(default)
 
-    def fillGrid(y: Int, grid: Array[State]): Array[State] = {
-      if (y >= height)
-        grid
-      else
-        fillGrid(y + 1, grid ++ fillLine)
-    }
 
-    fillGrid(0, Array[State]())
-  }
-
+  /*
+   *  Returns all valid neighbours given a coordinates.
+   *  Is valid if the tile is in the inner bounds of the map and the tile
+   *  is hosting an Empty() case class instance.
+   */
   def getValidNeighbours(grid: Array[State], x: Int, y: Int): Array[(Int, Int)] = {
     def possibleMoves: Array[(Int, Int)] =
       Array((0, -1), (-1, 0), (0, 1), (1, 0))
@@ -51,25 +46,54 @@ object Player extends App {
   }
 
 
+  /*
+   *  Compute the best direction to take between UP, LEFT, DOWN, and RIGHT.
+   *  grid: The current grid representing the global state of the game.
+   *  coord: The coordinates of my last position.
+   *  me: My id.
+   */
   def computeScore(grid: Array[State], coord: (Int, Int), me: Int): String = {
-    val movesAround: Array[(Int, Int)] =
-      Array((0, -1), (-1, 0), (0, 1), (1, 0), (0, -2), (-1, -1),
-        (-2, 0), (-1, 1), (0, 2), (1, 1), (2, 0), (1, -1))
+    /*
+     *  Return all possible moves change. i.e. the difference of coordinates to make a move.
+     *  It computes the moves up to two turns in advance.
+     */
+    val movesAround: Array[(Int, Int)] = {
+      def firstStep: Array[(Int, Int)] = Array((0, -1), (-1, 0), (0, 1), (1, 0))
 
+      firstStep
+        .flatMap(x => firstStep.map(y => (x._1 + y._1, x._2 + y._2)))
+        .filter(x => x != (0, 0))
+        .distinct ++ firstStep
+    }
+
+
+    /*
+     *  Check if a tile, given its coordinates, is correct.
+     */
     def validTile(grid: Array[State], x: Int, y: Int): Boolean =
       x >= 0 && x < width && y >= 0 && y < height && getValAt(grid, x, y) == Empty()
 
+    /*
+     *  Compute score.
+     *  The more valid tile are around me, the better the score is.
+     */
     def getScore(grid: Array[State], x: Int, y: Int): Int = {
       movesAround.map(move => (x + move._1, y + move._2))
         .count(move => validTile(grid, move._1, move._2))
     }
 
+    /*
+     *  Go in all four direction.
+     */
     def allMoves(grid: Array[State], x: Int, y: Int, depth: Int): Array[Int] =
       Array(helper(grid.clone, x, y - 1, depth),
         helper(grid.clone, x - 1, y, depth),
         helper(grid.clone, x, y + 1, depth),
         helper(grid.clone, x + 1, y, depth))
 
+    /*
+     *  Predict best score depending of my future moves for 3 turns in advance.
+     */
     def helper(grid: Array[State], x: Int, y: Int, depth: Int): Int = {
       if (!validTile(grid, x, y) || getValidNeighbours(grid, x, y).length <= 1)
         -10000000
@@ -97,12 +121,7 @@ object Player extends App {
 
 
   val grid: Array[State] = initGrid(Empty())
-  /*
-   *  On the grid:
-   *    - true means the tile is untouched.
-   *    - false means somebody left a trace on it.
-   */
-  var coord: (Int, Int) = (0, 0)
+  val coord: Array[(Int, Int)] = Array((0, 0))
 
   // game loop
   while(true) {
@@ -121,9 +140,9 @@ object Player extends App {
       setValAt(grid, Occupied(i), x1, y1)
 
       if (i == p)
-        coord = (x1, y1)
+        coord(0) = (x1, y1)
     }
 
-    println(computeScore(grid, coord, p))
+    println(computeScore(grid, coord(0), p))
   }
 }
