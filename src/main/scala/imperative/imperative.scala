@@ -3,7 +3,7 @@ package imperative
  /*
   * login: <arthur.douillard@epita.fr>
   * password: <SalutAdrienCaVa?>
-  * ranking: <12> // Classement des gens d'EPITA utilisant Scala
+  * ranking: <21> // Classement des gens d'EPITA utilisant Scala
   */
 object Player extends App {
   def width  = 30
